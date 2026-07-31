@@ -1,0 +1,16 @@
+{
+  "name": "deepseek-zero-hermes",
+  "version": "1.0.0",
+  "description": "DeepSeek zero-token API gateway for Hermes — OpenAI-compatible /v1/chat/completions via chat.deepseek.com browser session",
+  "main": "src/server.mjs",
+  "scripts": {
+    "start": "node src/server.mjs",
+    "login": "node src/login.mjs",
+    "test": "node src/test.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.54.0",
+    "ws": "^8.18.0",
+    "express": "^4.21.0"
+  }
+}
