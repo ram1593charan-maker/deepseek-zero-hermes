@@ -33,16 +33,21 @@ export async function makeRequest(messages, model = 'deepseek-chat') {
   // Navigate to DeepSeek chat to establish session
   await page.goto('https://chat.deepseek.com', { waitUntil: 'networkidle', timeout: 15000 });
 
-  // Check if still logged in
+  // Check if still logged in or on CAPTCHA
   const title = await page.title();
+  const url = page.url();
   if (title.includes('Login') || title.includes('sign in')) {
     await browser.close();
     throw new Error('Session expired — re-run npm run login');
   }
+  if (title.includes('Verify') || title.includes('captcha') || title.includes('human verification') || url.includes('/verify')) {
+    await browser.close();
+    throw new Error('CAPTCHA/human verification page detected. Please complete the CAPTCHA manually in the Chrome window on port 9222, then retry.');
+  }
 
-  // Send the chat message
-  const inputSelector = 'textarea[placeholder*="message"], textarea[placeholder*="send"], #input-area, [contenteditable="true"]';
-  const textarea = await page.waitForSelector(inputSelector, { timeout: 5000 });
+  // Send the chat message - try multiple selectors
+  const inputSelector = 'textarea[placeholder*="message"], textarea[placeholder*="Ask"], textarea[placeholder*="send"], #input-area, [contenteditable="true"], .chat-input textarea, [aria-label*="message"]';
+  const textarea = await page.waitForSelector(inputSelector, { timeout: 5000, state: 'visible' });
   await textarea.click();
 
   // Type the first message content
@@ -55,28 +60,11 @@ export async function makeRequest(messages, model = 'deepseek-chat') {
   // Wait for response to appear
   await page.waitForTimeout(3000);
 
-  // Try to extract the response from the chat
-  const responseSelectors = [
-    '.markdown.prose',
-    '.response-content',
-    '[class*="answer"]',
-    '[class*="response"]',
-    '.chat-response',
-    'article'
-  ];
+  // Wait for response to appear
+  await page.waitForTimeout(2000);
 
-  let answer = '';
-  for (const selector of responseSelectors) {
-    try {
-      const el = await page.$(selector);
-      if (el) {
-        answer = await el.textContent();
-        if (answer.trim()) break;
-      }
-    } catch (e) {
-      // continue trying
-    }
-  }
+  // Try to extract the response - look for markdown/code blocks
+  const answer = await page.$eval('pre, code, .markdown, .prose, .response-content, [class*="answer"]', el => el.textContent().trim()).catch(() => '');
 
   await browser.close();
   return answer || 'No response extracted';
